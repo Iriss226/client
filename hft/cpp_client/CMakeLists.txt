@@ -69,7 +69,15 @@ add_executable(hft_bot
   src/arena_client.cpp
 )
 
+add_executable(order_book_metrics_demo
+  src/order_book_metrics_demo.cpp
+)
+
 target_include_directories(hft_bot PRIVATE
+  ${CMAKE_CURRENT_SOURCE_DIR}/include
+)
+
+target_include_directories(order_book_metrics_demo PRIVATE
   ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 
@@ -84,6 +92,8 @@ target_link_libraries(hft_bot PRIVATE Threads::Threads)
 
 if(MSVC)
   target_compile_options(hft_bot PRIVATE /W4)
+  target_compile_options(order_book_metrics_demo PRIVATE /W4)
 else()
   target_compile_options(hft_bot PRIVATE -Wall -Wextra)
+  target_compile_options(order_book_metrics_demo PRIVATE -Wall -Wextra)
 endif()

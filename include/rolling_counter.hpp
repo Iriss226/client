@@ -1,16 +1,28 @@
 #pragma once
+
 #include <cstdint>
-// HW8 — sliding-window event counter. count() is called with a non-decreasing clock.
-//
-// Edge case that costs most people a test (see labs/week08.md step 5): ts_ns and
-// now_ns are UNSIGNED. Early on, now_ns <= window_ns and the mathematical cutoff
-// (now - window) is negative — there is no uint64_t that means that, and there is
-// no safe value to clamp it to. Only compute the subtraction when it is
-// meaningful; do not expire anything before then.
+#include <deque>
+
 struct RollingCounter {
-    explicit RollingCounter(uint64_t window_ns) { (void)window_ns;
-        // TODO(student): ring/deque of timestamps; amortized O(1).
+    explicit RollingCounter(uint64_t window_ns) : window_ns_(window_ns) {}
+
+    void add(uint64_t ts_ns) {
+        timestamps_.push_back(ts_ns);
     }
-    void add(uint64_t ts_ns) { (void)ts_ns; /* TODO(student) */ }
-    uint64_t count(uint64_t now_ns) { (void)now_ns; return 0; /* TODO: events with ts > now-window */ }
+
+    uint64_t count(uint64_t now_ns) {
+        if (now_ns < window_ns_) {
+            return static_cast<uint64_t>(timestamps_.size());
+        }
+
+        const uint64_t cutoff = now_ns - window_ns_;
+        while (!timestamps_.empty() && timestamps_.front() <= cutoff) {
+            timestamps_.pop_front();
+        }
+        return static_cast<uint64_t>(timestamps_.size());
+    }
+
+private:
+    uint64_t window_ns_;
+    std::deque<uint64_t> timestamps_;
 };

@@ -1,7 +1,18 @@
 #pragma once
+
 #include <cstdint>
-// HW12 — fast uint64 -> decimal text. Write the digits into out; return the length.
-inline int u64toa(std::uint64_t v, char* out) {
-    (void)v; (void)out;
-    return 0;   // TODO(student): beat snprintf/std::to_string; handle 0 and UINT64_MAX
+
+inline int u64toa(std::uint64_t value, char* out) {
+    char reversed[20];
+    int length = 0;
+    do {
+        reversed[length++] = static_cast<char>('0' + value % 10);
+        value /= 10;
+    } while (value != 0);
+
+    for (int i = 0; i < length; ++i) {
+        out[i] = reversed[length - i - 1];
+    }
+    out[length] = '\0';
+    return length;
 }

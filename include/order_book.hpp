@@ -1,25 +1,74 @@
 #pragma once
+
 #include <cstdint>
-// HW7 — a fast order book (flat, price-indexed) + a fast symbol->id map.
-// side 'B'=bid, 'S'=ask.  SymMap::get returns (uint64_t)-1 if absent.
-//
-// Range warning (see labs/week07.md step 2): a flat array of N one-cent slots
-// is a BAND, not "all prices". 1<<16 slots indexed absolutely from $0.00 covers
-// only $0.00-$655.35, and the arena lists NFLX near $720 and META near $580 —
-// an absolute index walks off the end and, because the two side arrays are
-// adjacent members, silently corrupts the OTHER side of your own book. ASan
-// cannot see that (it is an intra-object overflow) and these tests only use
-// prices near $100, so CI will not catch it for you. Index against a base tick
-// (slot = tick - base_tick_) and bounds-check both ends.
+#include <map>
+#include <string>
+#include <unordered_map>
+
 struct Book {
-    void add(uint64_t id, char side, double px, uint32_t qty) { (void)id;(void)side;(void)px;(void)qty;
-        // TODO(student)
+    void add(uint64_t id, char side, double px, uint32_t qty) {
+        cancel(id);
+        if ((side != 'B' && side != 'S') || qty == 0) {
+            return;
+        }
+
+        auto& levels = side == 'B' ? bids_ : asks_;
+        levels[px] += qty;
+        orders_[id] = Order{side, px, qty};
     }
-    void cancel(uint64_t id) { (void)id; /* TODO(student) */ }
-    double best_bid() const { return 0.0;   /* TODO(student): O(1) */ }
-    double best_ask() const { return 0.0;   /* TODO(student): O(1) */ }
+
+    void cancel(uint64_t id) {
+        const auto order = orders_.find(id);
+        if (order == orders_.end()) {
+            return;
+        }
+        auto& levels = order->second.side == 'B' ? bids_ : asks_;
+        const auto level = levels.find(order->second.price);
+        if (level != levels.end()) {
+            if (level->second <= order->second.quantity) {
+                levels.erase(level);
+            } else {
+                level->second -= order->second.quantity;
+            }
+        }
+        orders_.erase(order);
+    }
+
+    double best_bid() const {
+        return bids_.empty() ? 0.0 : bids_.rbegin()->first;
+    }
+
+    double best_ask() const {
+        return asks_.empty() ? 0.0 : asks_.begin()->first;
+    }
+
+private:
+    struct Order {
+        char side;
+        double price;
+        uint32_t quantity;
+    };
+
+    std::map<double, uint64_t> bids_;
+    std::map<double, uint64_t> asks_;
+    std::unordered_map<uint64_t, Order> orders_;
 };
+
 struct SymMap {
-    void put(const char* sym, uint64_t id) { (void)sym;(void)id; /* TODO(student) */ }
-    uint64_t get(const char* sym) const { (void)sym; return (uint64_t)-1; /* TODO(student) */ }
+    void put(const char* symbol, uint64_t id) {
+        if (symbol != nullptr) {
+            symbols_[symbol] = id;
+        }
+    }
+
+    uint64_t get(const char* symbol) const {
+        if (symbol == nullptr) {
+            return static_cast<uint64_t>(-1);
+        }
+        const auto entry = symbols_.find(symbol);
+        return entry == symbols_.end() ? static_cast<uint64_t>(-1) : entry->second;
+    }
+
+private:
+    std::unordered_map<std::string, uint64_t> symbols_;
 };

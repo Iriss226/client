@@ -50,6 +50,20 @@ This produces one executable: `build/hft_bot`.
 The first configure clones the two dependencies (needs internet); later builds
 are offline.
 
+## Top-of-book metrics demo
+
+`include/order_book_metrics.hpp` provides a dependency-free calculator for the
+best bid/ask, mid, spread, microprice, and order-book imbalance from bid/ask
+price levels. Run the included five-snapshot example with:
+
+```bash
+./build/order_book_metrics_demo
+```
+
+The demo prints all metrics per tick so the mid-price and imbalance evolution
+can be inspected side by side. A missing, invalid, or crossed book returns no
+metrics rather than producing misleading values.
+
 ## Run
 
 The client reads the **same environment variables** as `trader/config.py`:

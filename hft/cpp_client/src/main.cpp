@@ -12,6 +12,7 @@
 
 #include <atomic>
 #include <csignal>
+#include <cmath>
 #include <iostream>
 #include <string>
 #include <unordered_map>
@@ -33,35 +34,41 @@ public:
 private:
     void on_book(const std::string& symbol, double bid, double ask, double mid,
                  double microprice, double obi) override {
-        // TODO(student): THIS is your edge. microprice/obi are free signal
-        // inputs (M6) — but using them costs compute, which costs queue
-        // position. Everything below is a placeholder.
-        (void)microprice; (void)obi;
-        if (bid <= 0.0 || ask <= 0.0) return;          // need a two-sided book
+        (void)obi;
+        if (!std::isfinite(bid) || !std::isfinite(ask) ||
+            !std::isfinite(mid) || bid <= 0.0 || ask <= bid) {
+            return;
+        }
 
         const double spread   = ask - bid;
         const double last_mid = last_mid_.count(symbol) ? last_mid_[symbol] : mid;
         last_mid_[symbol]     = mid;
 
-        const int    pos    = position_[symbol];
-        const int    kClip  = 1;                        // shares per order
-        const int    kMaxPos = 5;                        // inventory cap
-        const double kEdge  = 0.02;                      // min spread to act on
+        const int    pos     = position_[symbol];
+        const int    kClip   = 1;
+        const int    kMaxPos = 5;
+        const double kEdge   = 0.02;
 
-        if (spread < kEdge) return;                      // too tight to bother
+        if (spread < kEdge) return;
 
-        // Momentum tilt: buy the ask when the mid is rising, sell the bid when
-        // it is falling — but only within the inventory cap.
-        if (mid > last_mid && pos < kMaxPos) {
-            buy_limit(symbol, kClip, ask);               // cross to buy
-        } else if (mid < last_mid && pos > -kMaxPos) {
-            sell_limit(symbol, kClip, bid);              // cross to sell
+        // Use the depth-weighted touch when it is available, and fall back to
+        // the mid-price change for replay tapes that omit depth statistics.
+        const bool has_microprice = microprice > 0.0 && std::isfinite(microprice);
+        const bool bullish = has_microprice ? microprice > mid
+                                            : mid > last_mid;
+        const bool bearish = has_microprice ? microprice < mid
+                                            : mid < last_mid;
+
+        if (bullish && pos < kMaxPos) {
+            buy_limit(symbol, kClip, ask);
+        } else if (bearish && pos > -kMaxPos) {
+            sell_limit(symbol, kClip, bid);
         }
     }
 
     void on_fill(const std::string& side, const std::string& symbol,
                  int quantity, double price, bool maker) override {
-        if (side.empty()) return;                        // not our fill
+        if ((side != "buy" && side != "sell") || quantity <= 0) return;
         position_[symbol] += (side == "buy") ? quantity : -quantity;
         std::cerr << "[fill] " << (maker ? "MAKER " : "taker ") << side << " "
                   << quantity << " " << symbol << " @ " << price
